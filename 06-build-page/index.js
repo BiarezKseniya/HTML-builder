@@ -68,24 +68,27 @@ readHTML.on('readable', function () {
     while ((component = regex.exec(templateData)) !== null) {
       let componentName = component[1] + '.html';
       let replaceValue = component[0];
-
-      fs.access(path.join(__dirname, '/components/', componentName), fs.constants.F_OK, (err) => {
-        if (err) {
-          console.error(`File ${componentName} does not exist!`);
-        } else {
-        const readComponent = fs.createReadStream(path.join(__dirname, '/components/', componentName));
-        promises.push(new Promise((resolve) => {
-          readComponent.on('readable', function () {
-            let componentData = readComponent.read();
-            if (componentData != null) {
-              componentData = componentData.toString();
-              templateData = templateData.replace(replaceValue, componentData);
-            }
+    
+      let promise = new Promise((resolve) => {
+        fs.access(path.join(__dirname, '/components/', componentName), (err) => {
+          if (err) {
+            console.error(`File ${componentName} does not exist!`);
             resolve();
-          })
-        }));
-      }
-    });
+          } else {
+            const readComponent = fs.createReadStream(path.join(__dirname, '/components/', componentName));
+            readComponent.on('readable', function () {
+              let componentData = readComponent.read();
+              if (componentData != null) {
+                componentData = componentData.toString();
+                templateData = templateData.replace(replaceValue, componentData);
+              }
+              resolve();
+            })
+          }
+        });
+      });
+    
+      promises.push(promise);
     }
 
     Promise.all(promises).then(() => {
