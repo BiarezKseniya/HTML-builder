@@ -1,3 +1,4 @@
+const { promises } = require('node:dns');
 const fs = require('node:fs');
 const fsPromises = require('fs').promises;
 const path = require('node:path');
@@ -7,22 +8,43 @@ fsPromises.mkdir(path.join(__dirname, 'project-dist'), { recursive: true });
 // Copy assets
 
 function copyDir(sourcePath, targetPath) {
+  let promisesArray = [];
 
   fsPromises.mkdir(targetPath, { recursive: true });
-  fs.readdir(sourcePath, { withFileTypes: true }, (err, files) => {
+  fs.readdir(targetPath, { withFileTypes: true }, (err, oldFiles) => {
     if (err)
       console.log(err);
     else {
-      files.forEach(file => {
-        let subSourcePath = path.join(sourcePath, '/', file.name);
-        let subTargetPath = path.join(targetPath, '/', file.name);
-        if (file.isDirectory()) {
-          copyDir(subSourcePath, subTargetPath);
-        } else {
-          fsPromises.copyFile(subSourcePath, subTargetPath);
-        }
+      oldFiles.forEach(oldFile => {
+        promisesArray.push(new Promise((resolve) => {
+          fs.rm(path.join(targetPath, '/', oldFile.name), { recursive: true }, (err) => {
+            resolve();
+            if (err) {
+              console.log(err);
+            }
+          })
+        }));
+
       })
     }
+
+    Promise.all(promisesArray).then(() => {
+      fs.readdir(sourcePath, { withFileTypes: true }, (err, files) => {
+        if (err)
+          console.log(err);
+        else {
+          files.forEach(file => {
+            let subSourcePath = path.join(sourcePath, '/', file.name);
+            let subTargetPath = path.join(targetPath, '/', file.name);
+            if (file.isDirectory()) {
+              copyDir(subSourcePath, subTargetPath);
+            } else {
+              fsPromises.copyFile(subSourcePath, subTargetPath);
+            }
+          })
+        }
+      })
+    });
   })
 }
 
@@ -68,7 +90,7 @@ readHTML.on('readable', function () {
     while ((component = regex.exec(templateData)) !== null) {
       let componentName = component[1] + '.html';
       let replaceValue = component[0];
-    
+
       let promise = new Promise((resolve) => {
         fs.access(path.join(__dirname, '/components/', componentName), (err) => {
           if (err) {
@@ -87,7 +109,7 @@ readHTML.on('readable', function () {
           }
         });
       });
-    
+
       promises.push(promise);
     }
 
